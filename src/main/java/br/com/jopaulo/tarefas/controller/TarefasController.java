@@ -2,6 +2,7 @@ package br.com.jopaulo.tarefas.controller;
 
 import java.util.Date;
 
+import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +15,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.ModelAndView;
 
 import br.com.jopaulo.tarefas.modelos.Tarefa;
+import br.com.jopaulo.tarefas.modelos.Usuario;
 import br.com.jopaulo.tarefas.repositorios.RepositorioTarefa;
+import br.com.jopaulo.tarefas.servicos.ServicoUsuario;
 
 @Controller
 @RequestMapping("/tarefas")
@@ -23,12 +26,16 @@ public class TarefasController {
 	// injeção de depedências
 	@Autowired
 	private RepositorioTarefa repositorioTarefa;
+	
+	@Autowired
+	private ServicoUsuario servicoUsuario;
 
 	@GetMapping("listar")
-	public ModelAndView listar() {
+	public ModelAndView listar(HttpServletRequest request) {
 		ModelAndView mv = new ModelAndView();
 		mv.setViewName("tarefas/listar");
-		mv.addObject("tarefas", repositorioTarefa.findAll());
+		String emailSusario = request.getUserPrincipal().getName();
+		mv.addObject("tarefas", repositorioTarefa.carregarTarefasUsuario(emailSusario));
 		return mv;
 	}
 	
@@ -41,7 +48,7 @@ public class TarefasController {
 	}
 	
 	@PostMapping("/inserir")
-	public ModelAndView inserir(@Valid Tarefa tarefa, BindingResult result) {
+	public ModelAndView inserir(@Valid Tarefa tarefa, BindingResult result, HttpServletRequest request) {
 		ModelAndView mv = new ModelAndView();
 		if (tarefa.getDataExpiracao() == null) {
 			result.rejectValue("dataExpiracao", "tarefa.dataExpiracaoInvalida", 
@@ -55,9 +62,12 @@ public class TarefasController {
 		if (result.hasErrors()) {
 			mv.setViewName("tarefas/inserir");
 			mv.addObject(tarefa);
-		} else {			
-			mv.setViewName("redirect:/tarefas/listar");
+		} else {
+			String emailUsuario = request.getUserPrincipal().getName();
+			Usuario usuarioLogado = servicoUsuario.encontrarPorEmail(emailUsuario);
+			tarefa.setUsuario(usuarioLogado);
 			repositorioTarefa.save(tarefa);
+			mv.setViewName("redirect:/tarefas/listar");
 		}
 		return mv;
 	}
